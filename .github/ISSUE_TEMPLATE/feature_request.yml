@@ -1,0 +1,30 @@
+name: 功能建议
+description: 提议一个改进或新功能
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 请说明当前遇到的问题或希望改善的流程。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 请描述期望行为和界面变化。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选方案
+      description: 是否考虑过其他实现方式？
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: 兼容性影响
+      description: 是否影响 PHP 8.0、无 JavaScript 使用或单文件部署？

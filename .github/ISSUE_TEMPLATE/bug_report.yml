@@ -1,0 +1,63 @@
+name: Bug 报告
+description: 报告可复现的功能异常
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。安全漏洞请不要在此公开提交，请按 SECURITY.md 私下报告。
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: 请填写提交哈希或版本标签。
+      placeholder: v1.1.1 / 07e629a
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 运行环境
+      description: PHP 版本、Web 服务器、操作系统和浏览器。
+      placeholder: PHP 8.3 / Nginx / Debian 12 / Chrome
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请提供最小、完整的复现步骤。
+      placeholder: |
+        1. 选择……
+        2. 设置……
+        3. 点击……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 补充信息
+      description: 可附上已脱敏的错误信息或截图。请勿提交生成的密码、Cookie、令牌或其他凭据。
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已确认这不是应通过 SECURITY.md 私下报告的安全漏洞。
+          required: true
+        - label: 我已删除生成的密码、Cookie、令牌和其他敏感信息。
+          required: true

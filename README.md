@@ -1,59 +1,83 @@
 # 安全密码生成器
 
-一个功能完整、安全可靠的密码生成工具，完全包含在一个 PHP 文件中。
+一个无需数据库和外部依赖的单文件 PHP 密码生成工具。
 
-![PHP](https://img.shields.io/badge/PHP-8.0+-777BB4?style=flat&logo=php)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/version-2.0.0-green.svg)
+[![Quality](https://github.com/allury/passwd-generator/actions/workflows/quality.yml/badge.svg)](https://github.com/allury/passwd-generator/actions/workflows/quality.yml)
+![PHP](https://img.shields.io/badge/PHP-8.0%2B-777BB4?style=flat&logo=php)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## 在线演示
 
 👉 [立即体验](https://tool.706632.xyz/passwd.php)
 
+在线演示用于体验功能，涉及敏感用途时建议自行部署并通过 HTTPS 访问。
+
 ## 主要功能
 
-- **加密安全生成**：使用 `random_int()` 生成高强度随机密码
-- **智能过滤**：默认过滤易混淆字符（`0O1lI`），并避免连续重复字符
-- **强制复杂度**：确保每种选中的字符类型至少出现一次
-- **实时交互**：修改任意选项后自动重新生成密码
-- **密码强度评估**：实时可视化显示密码强度
-- **一键复制**：支持快速复制生成的密码
-- **主题切换**：支持浅色 / 深色主题，并自动保存用户偏好
-- **优雅降级**：即使禁用 JavaScript 也能正常使用
+- **加密安全生成**：使用 `random_int()` 生成高强度随机密码。
+- **智能过滤**：默认过滤易混淆字符（`0O1lI`），并避免连续重复字符。
+- **强制复杂度**：确保每种选中的字符类型至少出现一次。
+- **实时交互**：修改选项后自动重新生成密码。
+- **密码强度评估**：实时显示密码强度。
+- **一键复制**：快速复制生成的密码。
+- **主题切换**：支持浅色与深色主题，并保存用户偏好。
+- **优雅降级**：禁用 JavaScript 时仍可使用。
+
+## 环境要求
+
+- PHP 8.0 或更高版本。
+- Apache、Nginx、Caddy 等 Web 服务器，或 PHP 内置开发服务器。
+- 现代浏览器。
 
 ## 快速开始
 
-由于是单文件应用，部署非常简单：
+```bash
+git clone https://github.com/allury/passwd-generator.git
+cd passwd-generator
+php -S 127.0.0.1:8080
+```
 
-1. 下载 `passwd.php` 文件
-2. 上传到支持 PHP 的服务器（Apache / Nginx / Caddy 等）
-3. 直接通过浏览器访问该文件即可使用
+浏览器访问 `http://127.0.0.1:8080/passwd.php`。
 
-**无需安装、无需配置数据库、无需额外依赖。**
+生产环境部署只需将 `passwd.php` 上传到支持 PHP 的站点目录，然后通过浏览器访问。项目无需安装依赖或配置数据库。
 
-## 功能说明
+## 实现说明
 
-### 后端特性
-- 使用 `random_int()` 生成加密安全随机数
-- 默认开启「排除相似字符」功能
-- 默认开启「避免连续重复字符」功能
-- 自动保证字符类型多样性
-- 使用 Fisher-Yates 算法进行最终打乱
+### 后端
 
-### 前端特性
-- 现代化响应式界面
-- 支持浅色与深色主题切换（localStorage 持久化）
-- 实时 AJAX 生成，无需刷新页面
-- 实时密码强度指示器
-- 完善的 JavaScript 降级支持
+- 使用 `random_int()` 生成加密安全随机数。
+- 默认排除相似字符并避免连续重复字符。
+- 自动保证所选字符类型的多样性。
+- 使用 Fisher–Yates 算法完成最终打乱。
 
-## 技术栈
+### 前端
 
-- **后端**：纯 PHP（无任何框架或外部依赖）
-- **前端**：原生 HTML + CSS + JavaScript（ES6+）
-- **样式**：CSS 变量 + 响应式设计
-- **安全**：输出使用 `htmlspecialchars()` 编码
+- 原生 HTML、CSS 和 JavaScript，无前端框架依赖。
+- 支持响应式布局和浅色、深色主题。
+- 支持 AJAX 实时生成与普通表单降级。
+- 输出使用 `htmlspecialchars()` 编码。
+
+## 项目结构
+
+```text
+.
+├── passwd.php       # 完整应用
+├── README.md        # 使用说明
+├── CONTRIBUTING.md  # 贡献指南
+├── SECURITY.md      # 安全报告方式
+└── LICENSE          # MIT 许可证
+```
+
+## 开发与验证
+
+提交前执行 PHP 语法检查：
+
+```bash
+php -l passwd.php
+```
+
+详细流程见 [贡献指南](CONTRIBUTING.md)。安全问题请按 [安全政策](SECURITY.md) 私下报告。
 
 ## 许可证
 
-本项目基于 [MIT License](LICENSE) 开源协议。
+本项目基于 [MIT License](LICENSE) 开源。
