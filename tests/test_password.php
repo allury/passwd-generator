@@ -57,4 +57,15 @@ expect_true(
     'Empty character selection should return an error.'
 );
 
+expect_true(normalize_password_length([]) === 16, 'Array length input should use the default length.');
+expect_true(normalize_password_length(100) === 50, 'Length input should be capped at 50.');
+expect_true(normalize_password_length(4) === 8, 'Length input should be raised to the minimum of 8.');
+
+$_POST['lowercase'] = 'on';
+expect_true(post_checkbox_enabled('lowercase'), 'Checkbox value "on" should be enabled.');
+$_POST['lowercase'] = 'false';
+expect_true(!post_checkbox_enabled('lowercase'), 'Checkbox value "false" should be disabled.');
+$_POST['lowercase'] = [];
+expect_true(!post_checkbox_enabled('lowercase'), 'Array checkbox input should be disabled.');
+
 echo "Password generation tests passed." . PHP_EOL;

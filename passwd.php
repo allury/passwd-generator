@@ -8,13 +8,39 @@
  * 用于安全地生成密码，以及一个现代、响应式的前端界面
  * 用于用户交互。
  *
- * @version    1.1.2
+ * @version    1.1.3
  * @author     编码助手
  * @lastupdate 2026-08-01
  * ====================================================================
  */
 
 $http_request_method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+/**
+ * 将外部长度参数限制在界面支持的范围内，并拒绝数组等异常输入。
+ *
+ * @param mixed $value
+ * @return int
+ */
+function normalize_password_length(mixed $value): int {
+    $raw_length = is_scalar($value) ? (int)$value : 16;
+    return max(8, min(50, $raw_length));
+}
+
+/**
+ * 以兼容复选框表单和接口调用的方式读取字符类型选项。
+ *
+ * @param string $name
+ * @return bool
+ */
+function post_checkbox_enabled(string $name): bool {
+    $value = $_POST[$name] ?? null;
+    if (!is_scalar($value)) {
+        return false;
+    }
+
+    return in_array(strtolower(trim((string)$value)), ['1', 'true', 'on', 'yes'], true);
+}
 
 if (!headers_sent()) {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -144,15 +170,15 @@ function generate_secure_password(int $length, bool $include_uppercase, bool $in
 
 // 初始化密码选项的默认值
 $generated_password = '';
-$raw_length = (int)($_POST['length'] ?? 16);
-$length = max(8, min(50, $raw_length));
+$length = normalize_password_length($_POST['length'] ?? 16);
+$form_submitted = isset($_POST['form_submitted']) && is_scalar($_POST['form_submitted']);
 
 $options = [
     'length' => $length,
-    'lowercase' => isset($_POST['form_submitted']) ? isset($_POST['lowercase']) : true,
-    'uppercase' => isset($_POST['form_submitted']) ? isset($_POST['uppercase']) : true,
-    'numbers' => isset($_POST['form_submitted']) ? isset($_POST['numbers']) : true,
-    'symbols' => isset($_POST['form_submitted']) ? isset($_POST['symbols']) : true,
+    'lowercase' => $form_submitted ? post_checkbox_enabled('lowercase') : true,
+    'uppercase' => $form_submitted ? post_checkbox_enabled('uppercase') : true,
+    'numbers' => $form_submitted ? post_checkbox_enabled('numbers') : true,
+    'symbols' => $form_submitted ? post_checkbox_enabled('symbols') : true,
 ];
 
 // 判断请求类型：是AJAX请求还是常规的表单提交
@@ -163,15 +189,20 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
     
     $generated_password = generate_secure_password(
         $length,
-        (bool)($_POST['uppercase'] ?? false),
-        (bool)($_POST['lowercase'] ?? false),
-        (bool)($_POST['numbers'] ?? false),
-        (bool)($_POST['symbols'] ?? false)
+        post_checkbox_enabled('uppercase'),
+        post_checkbox_enabled('lowercase'),
+        post_checkbox_enabled('numbers'),
+        post_checkbox_enabled('symbols')
     );
     
     // 以JSON格式返回结果给前端JavaScript
     header('Content-Type: application/json; charset=UTF-8');
-    echo json_encode(['password' => $generated_password]);
+    if (str_starts_with($generated_password, '错误：')) {
+        http_response_code(422);
+        echo json_encode(['error' => $generated_password], JSON_UNESCAPED_UNICODE);
+    } else {
+        echo json_encode(['password' => $generated_password], JSON_UNESCAPED_UNICODE);
+    }
     exit;
 }
 // 常规表单提交用于在JavaScript被禁用的情况下也能正常工作
@@ -372,15 +403,29 @@ else if ($http_request_method === 'POST') {
             let generationController = null;
 
             // --- 主题管理 ---
+            const getStoredTheme = () => {
+                try {
+                    return localStorage.getItem('theme');
+                } catch (error) {
+                    return null;
+                }
+            };
+            const saveTheme = (theme) => {
+                try {
+                    localStorage.setItem('theme', theme);
+                } catch (error) {
+                    // 存储不可用时仍保持本次页面会话的主题设置。
+                }
+            };
             const setTheme = (theme) => {
                 body.className = theme === 'dark' ? 'dark-mode' : '';
-                localStorage.setItem('theme', theme);
+                saveTheme(theme);
                 lightThemeBtn.classList.toggle('active', theme === 'light');
                 darkThemeBtn.classList.toggle('active', theme === 'dark');
             };
             lightThemeBtn.addEventListener('click', () => setTheme('light'));
             darkThemeBtn.addEventListener('click', () => setTheme('dark'));
-            setTheme(localStorage.getItem('theme') || 'light'); // 优先从本地存储加载主题
+            setTheme(getStoredTheme() || 'light'); // 优先从本地存储加载主题
 
             // --- 核心功能函数 ---
 
@@ -409,11 +454,12 @@ else if ($http_request_method === 'POST') {
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, 
                     body: new URLSearchParams(new FormData(passwordForm)) 
                 })
-                .then(response => {
+                .then(async response => {
+                    const data = await response.json().catch(() => null);
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
+                        throw new Error(data && typeof data.error === 'string' ? data.error : `HTTP ${response.status}`);
                     }
-                    return response.json();
+                    return data;
                 })
                 .then(data => {
                     if (requestId !== generationRequestId || !data || typeof data.password !== 'string') {
@@ -429,9 +475,10 @@ else if ($http_request_method === 'POST') {
                     if (error.name === 'AbortError' || requestId !== generationRequestId) {
                         return;
                     }
-                    resultTextarea.value = '';
+                    const errorMessage = error && typeof error.message === 'string' ? error.message : '';
+                    resultTextarea.value = errorMessage.startsWith('错误：') ? errorMessage : '';
                     updateStrengthIndicator('');
-                    strengthText.textContent = '生成失败';
+                    strengthText.textContent = errorMessage.startsWith('错误：') ? errorMessage : '生成失败';
                     console.error('密码生成失败:', error);
                 })
                 .finally(() => {
