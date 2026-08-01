@@ -6,6 +6,13 @@
 ![PHP](https://img.shields.io/badge/PHP-8.0%2B-777BB4?style=flat&logo=php)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+## v1.1.2 更新
+
+- 修复最终随机重排可能重新产生相邻重复字符的问题，使实现与密码生成说明保持一致。
+- 增加密码响应的禁止缓存标记，并统一 AJAX 响应的字符集声明。
+- 防止连续操作时旧的 AJAX 响应覆盖最新结果；请求失败时清空旧密码并明确显示失败状态。
+- 保持现有生成规则和部署方式不变，不引入新的用户功能。
+
 ## 在线演示
 
 👉 [立即体验](https://tool.706632.xyz/passwd.php)

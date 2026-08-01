@@ -8,30 +8,64 @@
  * 用于安全地生成密码，以及一个现代、响应式的前端界面
  * 用于用户交互。
  *
- * @version    1.1.0
+ * @version    1.1.2
  * @author     编码助手
- * @lastupdate 2026-07-11
+ * @lastupdate 2026-08-01
  * ====================================================================
  */
+
+$http_request_method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+if (!headers_sent()) {
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
 
 // --- 核心功能：安全地生成密码 ---
 
 /**
- * 使用 Fisher-Yates 算法安全打乱字符串
+ * 使用加密安全随机数重排字符串，并避免相邻字符重复
  *
  * @param string $string
  * @return string
  */
 function secure_str_shuffle(string $string): string {
-    $chars = str_split($string);
-    $n = count($chars);
-    for ($i = $n - 1; $i > 0; $i--) {
-        $j = random_int(0, $i);
-        $tmp = $chars[$i];
-        $chars[$i] = $chars[$j];
-        $chars[$j] = $tmp;
+    $counts = array_count_values(str_split($string));
+    $remaining = strlen($string);
+    $previous = null;
+    $result = '';
+
+    while ($remaining > 0) {
+        $max_count = 0;
+        $candidates = [];
+
+        foreach ($counts as $raw_char => $count) {
+            $char = (string)$raw_char;
+            if ($count <= 0 || $char === $previous) {
+                continue;
+            }
+
+            if ($count > $max_count) {
+                $max_count = $count;
+                $candidates = [$raw_char];
+            } elseif ($count === $max_count) {
+                $candidates[] = $raw_char;
+            }
+        }
+
+        if (empty($candidates)) {
+            throw new RuntimeException('无法生成不含相邻重复字符的密码。');
+        }
+
+        $chosen = $candidates[random_int(0, count($candidates) - 1)];
+        $result .= (string)$chosen;
+        $counts[$chosen]--;
+        $previous = (string)$chosen;
+        $remaining--;
     }
-    return implode('', $chars);
+
+    return $result;
 }
 
 /**
@@ -123,9 +157,9 @@ $options = [
 
 // 判断请求类型：是AJAX请求还是常规的表单提交
 // AJAX请求用于无刷新更新密码，提升用户体验
-if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
     strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest' &&
-    $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $http_request_method === 'POST') {
     
     $generated_password = generate_secure_password(
         $length,
@@ -136,12 +170,12 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
     );
     
     // 以JSON格式返回结果给前端JavaScript
-    header('Content-Type: application/json');
+    header('Content-Type: application/json; charset=UTF-8');
     echo json_encode(['password' => $generated_password]);
     exit;
 }
 // 常规表单提交用于在JavaScript被禁用的情况下也能正常工作
-else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+else if ($http_request_method === 'POST') {
     $generated_password = generate_secure_password(
         $length,
         (bool)$options['uppercase'],
@@ -334,6 +368,8 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   incrementBtn = getEl('increment'), strengthIndicator = getEl('strengthIndicator'),
                   strengthText = getEl('strengthText'), body = document.body,
                   lightThemeBtn = getEl('light-theme'), darkThemeBtn = getEl('dark-theme');
+            let generationRequestId = 0;
+            let generationController = null;
 
             // --- 主题管理 ---
             const setTheme = (theme) => {
@@ -352,29 +388,61 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              * 异步生成密码并更新UI
              */
             function generatePassword() {
+                const requestId = ++generationRequestId;
                 const defaultState = generateBtn.querySelector('.state-default');
                 const loadingState = generateBtn.querySelector('.state-loading');
+
+                if (generationController) {
+                    generationController.abort();
+                }
+                generationController = new AbortController();
                 
                 // 切换到加载状态
                 defaultState.style.display = 'none'; 
                 loadingState.style.display = 'inline-flex';
+                generateBtn.disabled = true;
                 
                 // 发送AJAX请求到后端
                 fetch('', { 
                     method: 'POST', 
+                    signal: generationController.signal,
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, 
                     body: new URLSearchParams(new FormData(passwordForm)) 
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    if (requestId !== generationRequestId || !data || typeof data.password !== 'string') {
+                        if (requestId === generationRequestId) {
+                            throw new Error('服务器返回了无效的密码数据');
+                        }
+                        return;
+                    }
                     resultTextarea.value = data.password;
                     updateStrengthIndicator(data.password);
                 })
-                .catch(error => { console.error('密码生成失败:', error); })
+                .catch(error => {
+                    if (error.name === 'AbortError' || requestId !== generationRequestId) {
+                        return;
+                    }
+                    resultTextarea.value = '';
+                    updateStrengthIndicator('');
+                    strengthText.textContent = '生成失败';
+                    console.error('密码生成失败:', error);
+                })
                 .finally(() => {
+                    if (requestId !== generationRequestId) {
+                        return;
+                    }
+                    generationController = null;
                     // 无论成功或失败，都恢复按钮的默认状态
                     defaultState.style.display = 'inline-flex'; 
                     loadingState.style.display = 'none';
+                    generateBtn.disabled = false;
                 });
             }
 

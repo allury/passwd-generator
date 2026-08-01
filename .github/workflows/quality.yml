@@ -39,3 +39,6 @@ jobs:
 
       - name: Check PHP syntax
         run: php -l passwd.php
+
+      - name: Run behavior tests
+        run: php tests/test_password.php
