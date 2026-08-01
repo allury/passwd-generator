@@ -1,11 +1,10 @@
 # 安全密码生成器
 
-一个无需数据库和外部依赖的单文件 PHP 密码生成工具。
-
 [![Quality](https://github.com/allury/passwd-generator/actions/workflows/quality.yml/badge.svg)](https://github.com/allury/passwd-generator/actions/workflows/quality.yml)
 ![PHP](https://img.shields.io/badge/PHP-8.0%2B-777BB4?style=flat&logo=php)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+一个无需数据库和外部依赖的单文件 PHP 密码生成工具。
 
 ## 在线演示
 
