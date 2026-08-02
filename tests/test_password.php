@@ -58,6 +58,7 @@ expect_true(
 );
 
 expect_true(normalize_password_length([]) === 16, 'Array length input should use the default length.');
+expect_true(normalize_password_length('not-a-number') === 16, 'Invalid length input should use the default length.');
 expect_true(normalize_password_length(100) === 50, 'Length input should be capped at 50.');
 expect_true(normalize_password_length(4) === 8, 'Length input should be raised to the minimum of 8.');
 
@@ -67,5 +68,15 @@ $_POST['lowercase'] = 'false';
 expect_true(!post_checkbox_enabled('lowercase'), 'Checkbox value "false" should be disabled.');
 $_POST['lowercase'] = [];
 expect_true(!post_checkbox_enabled('lowercase'), 'Array checkbox input should be disabled.');
+
+$successful_result = generate_password_result(16, true, true, true, true);
+expect_true($successful_result['status'] === 200, 'Successful generation should return HTTP status 200.');
+expect_true(is_string($successful_result['password']), 'Successful generation should include a password.');
+expect_true($successful_result['error'] === null, 'Successful generation should not include an error.');
+
+$invalid_result = generate_password_result(16, false, false, false, false);
+expect_true($invalid_result['status'] === 422, 'Invalid options should return HTTP status 422.');
+expect_true($invalid_result['password'] === null, 'Invalid options should not include a password.');
+expect_true(str_starts_with((string)$invalid_result['error'], '错误：'), 'Invalid options should include a safe error message.');
 
 echo "Password generation tests passed." . PHP_EOL;

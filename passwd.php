@@ -8,9 +8,9 @@
  * 用于安全地生成密码，以及一个现代、响应式的前端界面
  * 用于用户交互。
  *
- * @version    1.1.3
+ * @version    1.1.4
  * @author     编码助手
- * @lastupdate 2026-08-01
+ * @lastupdate 2026-08-02
  * ====================================================================
  */
 
@@ -23,7 +23,14 @@ $http_request_method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
  * @return int
  */
 function normalize_password_length(mixed $value): int {
-    $raw_length = is_scalar($value) ? (int)$value : 16;
+    if (is_int($value)) {
+        $raw_length = $value;
+    } elseif (is_string($value) && preg_match('/^[+-]?\d+$/', trim($value))) {
+        $raw_length = (int)trim($value);
+    } else {
+        return 16;
+    }
+
     return max(8, min(50, $raw_length));
 }
 
@@ -166,6 +173,43 @@ function generate_secure_password(int $length, bool $include_uppercase, bool $in
     return secure_str_shuffle($password);
 }
 
+/**
+ * 将密码生成结果转换为适合页面和 AJAX 响应使用的安全结构。
+ *
+ * @return array{password: ?string, error: ?string, status: int}
+ */
+function generate_password_result(int $length, bool $include_uppercase, bool $include_lowercase, bool $include_numbers, bool $include_symbols): array {
+    try {
+        $password = generate_secure_password(
+            $length,
+            $include_uppercase,
+            $include_lowercase,
+            $include_numbers,
+            $include_symbols
+        );
+    } catch (Throwable $exception) {
+        return [
+            'password' => null,
+            'error' => '错误：密码生成失败，请稍后重试。',
+            'status' => 500,
+        ];
+    }
+
+    if (str_starts_with($password, '错误：')) {
+        return [
+            'password' => null,
+            'error' => $password,
+            'status' => 422,
+        ];
+    }
+
+    return [
+        'password' => $password,
+        'error' => null,
+        'status' => 200,
+    ];
+}
+
 // --- 页面逻辑：处理用户输入和显示 ---
 
 // 初始化密码选项的默认值
@@ -187,7 +231,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
     strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest' &&
     $http_request_method === 'POST') {
     
-    $generated_password = generate_secure_password(
+    $generation_result = generate_password_result(
         $length,
         post_checkbox_enabled('uppercase'),
         post_checkbox_enabled('lowercase'),
@@ -197,23 +241,24 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
     
     // 以JSON格式返回结果给前端JavaScript
     header('Content-Type: application/json; charset=UTF-8');
-    if (str_starts_with($generated_password, '错误：')) {
-        http_response_code(422);
-        echo json_encode(['error' => $generated_password], JSON_UNESCAPED_UNICODE);
+    if ($generation_result['error'] !== null) {
+        http_response_code($generation_result['status']);
+        echo json_encode(['error' => $generation_result['error']], JSON_UNESCAPED_UNICODE);
     } else {
-        echo json_encode(['password' => $generated_password], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['password' => $generation_result['password']], JSON_UNESCAPED_UNICODE);
     }
     exit;
 }
 // 常规表单提交用于在JavaScript被禁用的情况下也能正常工作
 else if ($http_request_method === 'POST') {
-    $generated_password = generate_secure_password(
+    $generation_result = generate_password_result(
         $length,
         (bool)$options['uppercase'],
         (bool)$options['lowercase'],
         (bool)$options['numbers'],
         (bool)$options['symbols']
     );
+    $generated_password = $generation_result['password'] ?? $generation_result['error'] ?? '';
 }
 ?>
 <!DOCTYPE html>
@@ -418,10 +463,11 @@ else if ($http_request_method === 'POST') {
                 }
             };
             const setTheme = (theme) => {
-                body.className = theme === 'dark' ? 'dark-mode' : '';
-                saveTheme(theme);
-                lightThemeBtn.classList.toggle('active', theme === 'light');
-                darkThemeBtn.classList.toggle('active', theme === 'dark');
+                const normalizedTheme = theme === 'dark' ? 'dark' : 'light';
+                body.classList.toggle('dark-mode', normalizedTheme === 'dark');
+                saveTheme(normalizedTheme);
+                lightThemeBtn.classList.toggle('active', normalizedTheme === 'light');
+                darkThemeBtn.classList.toggle('active', normalizedTheme === 'dark');
             };
             lightThemeBtn.addEventListener('click', () => setTheme('light'));
             darkThemeBtn.addEventListener('click', () => setTheme('dark'));
@@ -472,7 +518,8 @@ else if ($http_request_method === 'POST') {
                     updateStrengthIndicator(data.password);
                 })
                 .catch(error => {
-                    if (error.name === 'AbortError' || requestId !== generationRequestId) {
+                    const isAbortError = error && typeof error === 'object' && error.name === 'AbortError';
+                    if (isAbortError || requestId !== generationRequestId) {
                         return;
                     }
                     const errorMessage = error && typeof error.message === 'string' ? error.message : '';
@@ -530,7 +577,7 @@ else if ($http_request_method === 'POST') {
 
             // 复制按钮
             copyBtn.addEventListener('click', function() {
-                if (!resultTextarea.value) return;
+                if (!resultTextarea.value || resultTextarea.value.startsWith('错误：')) return;
                 navigator.clipboard.writeText(resultTextarea.value).then(() => {
                     const defaultState = this.querySelector('.state-default');
                     const successState = this.querySelector('.state-success');
