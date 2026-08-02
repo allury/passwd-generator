@@ -431,6 +431,69 @@ else if ($http_request_method === 'POST') {
 
     <script>
         /**
+         * 根据生成密码实际使用的字符池估算组合空间，并返回强度展示信息。
+         *
+         * 该估算仅用于界面提示，不参与密码生成或传输。字符池大小需与
+         * generate_secure_password() 中过滤易混淆字符后的字符集保持一致。
+         *
+         * @param {string} password - 需要评估的密码
+         * @returns {{percentage: number, color: string, text: string}}
+         */
+        function calculatePasswordStrength(password) {
+            const emptyStrength = { percentage: 0, color: '#e0e0e0', text: '-' };
+            if (typeof password !== 'string' || password === '' || password.startsWith('错误：')) {
+                return emptyStrength;
+            }
+
+            // 小写字母移除 l（25），大写字母移除 O/I（24），数字移除 0/1（8）。
+            const characterSets = [
+                { pattern: /[a-z]/, size: 25 },
+                { pattern: /[A-Z]/, size: 24 },
+                { pattern: /[0-9]/, size: 8 },
+                { pattern: /[^a-zA-Z0-9]/, size: 26 },
+            ];
+            const characterPoolSize = characterSets.reduce(
+                (size, characterSet) => size + (characterSet.pattern.test(password) ? characterSet.size : 0),
+                0
+            );
+
+            if (characterPoolSize === 0) {
+                return emptyStrength;
+            }
+
+            const estimatedEntropy = password.length * Math.log2(characterPoolSize);
+            let levelIndex;
+            if (estimatedEntropy < 40) {
+                levelIndex = 0;
+            } else if (estimatedEntropy < 60) {
+                levelIndex = 1;
+            } else if (estimatedEntropy < 80) {
+                levelIndex = 2;
+            } else if (estimatedEntropy < 100) {
+                levelIndex = 3;
+            } else {
+                levelIndex = 4;
+            }
+
+            // 短密码即使字符类型较多，也不应显示为过高等级。
+            if (password.length < 10) {
+                levelIndex = Math.min(levelIndex, 1);
+            } else if (password.length < 12) {
+                levelIndex = Math.min(levelIndex, 2);
+            }
+
+            const levels = [
+                { percentage: 20, color: '#e74c3c', text: '很弱' },
+                { percentage: 40, color: '#f39c12', text: '中等' },
+                { percentage: 60, color: '#3498db', text: '强' },
+                { percentage: 80, color: '#27ae60', text: '很强' },
+                { percentage: 100, color: '#27ae60', text: '极强' },
+            ];
+
+            return levels[levelIndex];
+        }
+
+        /**
          * ====================================================================
          * 前端交互逻辑
          * ====================================================================
@@ -545,32 +608,12 @@ else if ($http_request_method === 'POST') {
              * @param {string} password - 需要评估的密码
              */
             function updateStrengthIndicator(password) {
-                if (!password || password.includes('错误')) { password = ""; }
-                
-                // 评估标准：字符类型数量 + 长度加分
-                const hasLowercase = /[a-z]/.test(password), hasUppercase = /[A-Z]/.test(password), hasNumbers = /[0-9]/.test(password), hasSymbols = /[^a-zA-Z0-9]/.test(password);
-                const typeCount = [hasLowercase, hasUppercase, hasNumbers, hasSymbols].filter(Boolean).length;
-                let score = 0;
-                if(password.length > 0) { 
-                    score = typeCount + (password.length >= 12 ? 1 : 0) + (password.length >= 16 ? 1 : 0); 
-                }
-                
-                // 根据得分更新UI
-                let percentage = 0, color = '#e74c3c', text = '很弱';
-                switch(score) {
-                    case 0: case 1: percentage = 20; color = '#e74c3c'; text = '很弱'; break;
-                    case 2: percentage = 40; color = '#f39c12'; text = '中等'; break;
-                    case 3: percentage = 60; color = '#3498db'; text = '强'; break;
-                    case 4: percentage = 80; color = '#27ae60'; text = '很强'; break;
-                    case 5: case 6: percentage = 100; color = '#27ae60'; text = '极强'; break;
-                }
-                if (password.length === 0) { percentage = 0; text = '-'; color = '#e0e0e0'; }
-                
-                strengthIndicator.style.width = `${percentage}%`;
-                strengthIndicator.style.backgroundColor = color;
-                strengthText.textContent = text;
-                strengthText.style.color = color;
-                strengthIndicator.style.setProperty('--strength-color', color);
+                const strength = calculatePasswordStrength(password);
+                strengthIndicator.style.width = `${strength.percentage}%`;
+                strengthIndicator.style.backgroundColor = strength.color;
+                strengthText.textContent = strength.text;
+                strengthText.style.color = strength.color;
+                strengthIndicator.style.setProperty('--strength-color', strength.color);
             }
 
             // --- 事件监听器绑定 ---
