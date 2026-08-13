@@ -8,9 +8,9 @@
  * 用于安全地生成密码，以及一个现代、响应式的前端界面
  * 用于用户交互。
  *
- * @version    1.1.4
+ * @version    1.1.6
  * @author     编码助手
- * @lastupdate 2026-08-02
+ * @lastupdate 2026-08-13
  * ====================================================================
  */
 
@@ -53,6 +53,10 @@ if (!headers_sent()) {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
     header('Expires: 0');
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
 }
 
 // --- 核心功能：安全地生成密码 ---
@@ -266,17 +270,18 @@ else if ($http_request_method === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="无需外部依赖的安全随机密码生成器，可自定义长度和字符类型。">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%233b82f6'/%3E%3Cpath d='M20 29v-7a12 12 0 0 1 24 0v7h3a4 4 0 0 1 4 4v19a4 4 0 0 1-4 4H17a4 4 0 0 1-4-4V33a4 4 0 0 1 4-4h3zm7 0h10v-7a5 5 0 0 0-10 0v7zm5 9a4 4 0 0 0-2 7.5V50h4v-4.5A4 4 0 0 0 32 38z' fill='white'/%3E%3C/svg%3E">
     <title>安全密码生成器</title>
     <style>
-        /* --- 引入外部字体 --- */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
         /* --- CSS变量定义 (浅色与深色主题) --- */
         :root {
-            --bg-color: #f0f2f5; --card-bg-color: rgba(255, 255, 255, 0.65); --text-color: #1f2937; --text-color-light: #6b7280; --border-color: rgba(0, 0, 0, 0.08); --primary-color: #3b82f6; --primary-color-hover: #2563eb; --success-color: #10b981; --success-color-hover: #059669; --input-bg-color: rgba(255, 255, 255, 0.8); --switch-bg-color: #e5e7eb; --switch-handle-color: #ffffff; --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; --border-radius: 16px; --shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 4px 6px -1px rgba(0,0,0,0.05); --backdrop-blur: blur(12px); --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color-scheme: light;
+            --bg-color: #f0f2f5; --card-bg-color: rgba(255, 255, 255, 0.65); --text-color: #1f2937; --text-color-light: #6b7280; --border-color: rgba(0, 0, 0, 0.08); --primary-color: #3b82f6; --primary-color-hover: #2563eb; --success-color: #10b981; --success-color-hover: #059669; --input-bg-color: rgba(255, 255, 255, 0.8); --switch-bg-color: #e5e7eb; --switch-handle-color: #ffffff; --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; --border-radius: 16px; --shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 4px 6px -1px rgba(0,0,0,0.05); --backdrop-blur: blur(12px); --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); --strength-empty: #e0e0e0; --strength-weak: #e74c3c; --strength-medium: #f39c12; --strength-strong: #3498db; --strength-very-strong: #27ae60;
         }
-        body.dark-mode {
-            --bg-color: #111827; --card-bg-color: rgba(31, 41, 55, 0.65); --text-color: #f9fafb; --text-color-light: #9ca3af; --border-color: rgba(255, 255, 255, 0.1); --primary-color: #60a5fa; --primary-color-hover: #3b82f6; --success-color: #34d399; --success-color-hover: #10b981; --input-bg-color: rgba(55, 65, 81, 0.8); --switch-bg-color: #4b5563; --switch-handle-color: #e5e7eb; --shadow: 0 10px 25px -5px rgba(0,0,0,0.2), 0 4px 6px -1px rgba(0,0,0,0.1);
+        :root.theme-dark, body.dark-mode {
+            color-scheme: dark;
+            --bg-color: #111827; --card-bg-color: rgba(31, 41, 55, 0.65); --text-color: #f9fafb; --text-color-light: #9ca3af; --border-color: rgba(255, 255, 255, 0.1); --primary-color: #60a5fa; --primary-color-hover: #3b82f6; --success-color: #34d399; --success-color-hover: #10b981; --input-bg-color: rgba(55, 65, 81, 0.8); --switch-bg-color: #4b5563; --switch-handle-color: #e5e7eb; --shadow: 0 10px 25px -5px rgba(0,0,0,0.2), 0 4px 6px -1px rgba(0,0,0,0.1); --strength-empty: #6b7280; --strength-weak: #f87171; --strength-medium: #fbbf24; --strength-strong: #60a5fa; --strength-very-strong: #34d399;
         }
 
         /* --- 全局与基础样式 --- */
@@ -293,7 +298,7 @@ else if ($http_request_method === 'POST') {
         .theme-toggle button.active { background: var(--primary-color); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         
         /* --- 密码显示与操作按钮 --- */
-        #result { width: 100%; padding: 14px 16px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 20px; background: var(--input-bg-color); word-break: break-all; height: 80px; resize: none; overflow-y: auto; color: var(--text-color); transition: var(--transition); font-family: 'Courier New', Courier, monospace; display: flex; align-items: center; justify-content: center; text-align: center; }
+        #result { width: 100%; padding: 14px 16px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 20px; line-height: 25px; background: var(--input-bg-color); word-break: break-all; height: 80px; resize: none; overflow-y: auto; color: var(--text-color); transition: var(--transition); font-family: 'Courier New', Courier, monospace; text-align: center; }
         #result:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
         body.dark-mode #result:focus { box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3); }
         .password-actions { display: flex; gap: 12px; margin-top: 15px; }
@@ -310,6 +315,7 @@ else if ($http_request_method === 'POST') {
         .switch-container { display: flex; align-items: center; justify-content: space-between; background: var(--input-bg-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 12px; transition: var(--transition); }
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
+        .switch input:focus-visible + .slider { outline: 2px solid var(--primary-color); outline-offset: 2px; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--switch-bg-color); transition: .4s cubic-bezier(0.25, 0.8, 0.25, 1); border-radius: 26px; }
         .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: var(--switch-handle-color); transition: .4s cubic-bezier(0.25, 0.8, 0.25, 1); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         input:checked + .slider { background-color: var(--primary-color); }
@@ -320,7 +326,7 @@ else if ($http_request_method === 'POST') {
         .btn-decrement, .btn-increment { width: 44px; height: 44px; background: transparent; border: none; border-radius: 8px; font-size: 24px; font-weight: 400; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text-color-light); transition: var(--transition); }
         .btn-decrement:hover, .btn-increment:hover { background: var(--switch-bg-color); color: var(--text-color); }
         .length-input { flex-grow: 1; text-align: center; font-weight: 700; font-size: 20px; border: none; background: transparent; color: var(--text-color); padding: 0 8px; }
-        .length-input:focus { outline: none; }
+        .btn:focus-visible, .btn-decrement:focus-visible, .btn-increment:focus-visible, .theme-toggle button:focus-visible, .length-input:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
         
@@ -332,12 +338,35 @@ else if ($http_request_method === 'POST') {
         
         /* --- 响应式设计 --- */
         @media (max-width: 500px) { .container { padding: 20px; } .header h1 { font-size: 24px; } .password-actions { flex-direction: column; } }
+
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            *, *::before, *::after { transition: none !important; animation: none !important; }
+        }
         
         /* --- 动画效果 --- */
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
+    <script>
+        (() => {
+            let theme = null;
+            try {
+                theme = localStorage.getItem('theme');
+            } catch (error) {
+                // 存储不可用时使用系统主题。
+            }
+            if (theme !== 'light' && theme !== 'dark') {
+                theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            document.documentElement.classList.toggle('theme-dark', theme === 'dark');
+            document.documentElement.dataset.theme = theme;
+        })();
+    </script>
 </head>
 <body>
+    <script>
+        document.body.classList.toggle('dark-mode', document.documentElement.dataset.theme === 'dark');
+    </script>
     <!-- 主容器 -->
     <div class="container">
         
@@ -346,8 +375,8 @@ else if ($http_request_method === 'POST') {
             <h1>安全密码生成器</h1>
             <p>快速创建高强度、可自定义的随机密码</p>
             <div class="theme-toggle">
-                <button id="light-theme" type="button">☀️ 浅色</button>
-                <button id="dark-theme" type="button">🌙 深色</button>
+                <button id="light-theme" type="button" aria-pressed="false">☀️ 浅色</button>
+                <button id="dark-theme" type="button" aria-pressed="false">🌙 深色</button>
             </div>
         </header>
         
@@ -356,7 +385,7 @@ else if ($http_request_method === 'POST') {
             
             <!-- 密码显示与操作区域 -->
             <div class="password-display">
-                <textarea id="result" rows="1" readonly placeholder="点击“生成”按钮创建密码"><?php echo htmlspecialchars($generated_password); ?></textarea>
+                <textarea id="result" rows="1" readonly aria-label="生成的密码" placeholder="点击“生成”按钮创建密码"><?php echo htmlspecialchars($generated_password); ?></textarea>
                 <div class="password-actions">
                     <button type="button" class="btn btn-copy" id="copyBtn" aria-live="polite">
                         <span class="state-default" style="display: inline-flex; align-items: center; gap: 8px;">
@@ -366,6 +395,9 @@ else if ($http_request_method === 'POST') {
                         <span class="state-success" style="display: none; align-items: center; gap: 8px;">
                             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>
                             <span>已复制!</span>
+                        </span>
+                        <span class="state-error" style="display: none; align-items: center; gap: 8px;">
+                            <span>复制失败，请手动选择复制</span>
                         </span>
                     </button>
                     <button type="submit" class="btn btn-generate" id="generateBtn">
@@ -387,9 +419,9 @@ else if ($http_request_method === 'POST') {
                 <div class="form-group">
                     <label for="length">密码长度</label>
                     <div class="length-control">
-                        <button class="btn-decrement" type="button" id="decrement">-</button>
+                        <button class="btn-decrement" type="button" id="decrement" aria-label="减少密码长度">-</button>
                         <input type="number" id="length" name="length" class="length-input" min="8" max="50" value="<?php echo (int)$options['length']; ?>">
-                        <button class="btn-increment" type="button" id="increment">+</button>
+                        <button class="btn-increment" type="button" id="increment" aria-label="增加密码长度">+</button>
                     </div>
                 </div>
                 <div class="switch-container">
@@ -423,7 +455,7 @@ else if ($http_request_method === 'POST') {
                 <div class="strength-meter">
                     <span class="strength-label">密码强度:</span>
                     <div class="indicator"><div class="progress" id="strengthIndicator"></div></div>
-                    <span class="strength-text" id="strengthText">-</span>
+                    <span class="strength-text" id="strengthText">未生成</span>
                 </div>
             </div>
         </form>
@@ -440,7 +472,7 @@ else if ($http_request_method === 'POST') {
          * @returns {{percentage: number, color: string, text: string}}
          */
         function calculatePasswordStrength(password) {
-            const emptyStrength = { percentage: 0, color: '#e0e0e0', text: '-' };
+            const emptyStrength = { percentage: 0, color: 'var(--strength-empty)', text: '未生成' };
             if (typeof password !== 'string' || password === '' || password.startsWith('错误：')) {
                 return emptyStrength;
             }
@@ -483,11 +515,11 @@ else if ($http_request_method === 'POST') {
             }
 
             const levels = [
-                { percentage: 20, color: '#e74c3c', text: '很弱' },
-                { percentage: 40, color: '#f39c12', text: '中等' },
-                { percentage: 60, color: '#3498db', text: '强' },
-                { percentage: 80, color: '#27ae60', text: '很强' },
-                { percentage: 100, color: '#27ae60', text: '极强' },
+                { percentage: 20, color: 'var(--strength-weak)', text: '很弱' },
+                { percentage: 40, color: 'var(--strength-medium)', text: '中等' },
+                { percentage: 60, color: 'var(--strength-strong)', text: '强' },
+                { percentage: 80, color: 'var(--strength-very-strong)', text: '很强' },
+                { percentage: 100, color: 'var(--strength-very-strong)', text: '极强' },
             ];
 
             return levels[levelIndex];
@@ -525,16 +557,42 @@ else if ($http_request_method === 'POST') {
                     // 存储不可用时仍保持本次页面会话的主题设置。
                 }
             };
-            const setTheme = (theme) => {
+            const setTheme = (theme, persist = true) => {
                 const normalizedTheme = theme === 'dark' ? 'dark' : 'light';
-                body.classList.toggle('dark-mode', normalizedTheme === 'dark');
-                saveTheme(normalizedTheme);
-                lightThemeBtn.classList.toggle('active', normalizedTheme === 'light');
-                darkThemeBtn.classList.toggle('active', normalizedTheme === 'dark');
+                const isDark = normalizedTheme === 'dark';
+                document.documentElement.classList.toggle('theme-dark', isDark);
+                document.documentElement.dataset.theme = normalizedTheme;
+                body.classList.toggle('dark-mode', isDark);
+                if (persist) {
+                    saveTheme(normalizedTheme);
+                }
+                lightThemeBtn.classList.toggle('active', !isDark);
+                darkThemeBtn.classList.toggle('active', isDark);
+                lightThemeBtn.setAttribute('aria-pressed', String(!isDark));
+                darkThemeBtn.setAttribute('aria-pressed', String(isDark));
             };
             lightThemeBtn.addEventListener('click', () => setTheme('light'));
             darkThemeBtn.addEventListener('click', () => setTheme('dark'));
-            setTheme(getStoredTheme() || 'light'); // 优先从本地存储加载主题
+            const storedTheme = getStoredTheme();
+            const hasStoredTheme = storedTheme === 'light' || storedTheme === 'dark';
+            const systemThemeQuery = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+            const initialTheme = hasStoredTheme
+                ? storedTheme
+                : (systemThemeQuery && systemThemeQuery.matches ? 'dark' : 'light');
+            setTheme(initialTheme, false);
+            if (!hasStoredTheme && systemThemeQuery) {
+                const updateSystemTheme = (event) => {
+                    const currentStoredTheme = getStoredTheme();
+                    if (currentStoredTheme !== 'light' && currentStoredTheme !== 'dark') {
+                        setTheme(event.matches ? 'dark' : 'light', false);
+                    }
+                };
+                if (typeof systemThemeQuery.addEventListener === 'function') {
+                    systemThemeQuery.addEventListener('change', updateSystemTheme);
+                } else if (typeof systemThemeQuery.addListener === 'function') {
+                    systemThemeQuery.addListener(updateSystemTheme);
+                }
+            }
 
             // --- 核心功能函数 ---
 
@@ -618,19 +676,54 @@ else if ($http_request_method === 'POST') {
 
             // --- 事件监听器绑定 ---
 
+            function copyUsingSelection() {
+                resultTextarea.focus();
+                resultTextarea.select();
+                resultTextarea.setSelectionRange(0, resultTextarea.value.length);
+                try {
+                    return document.execCommand('copy');
+                } catch (error) {
+                    return false;
+                }
+            }
+
+            function showCopyState(state) {
+                const defaultState = copyBtn.querySelector('.state-default');
+                const successState = copyBtn.querySelector('.state-success');
+                const errorState = copyBtn.querySelector('.state-error');
+                defaultState.style.display = state === 'default' ? 'inline-flex' : 'none';
+                successState.style.display = state === 'success' ? 'inline-flex' : 'none';
+                errorState.style.display = state === 'error' ? 'inline-flex' : 'none';
+                if (state !== 'default') {
+                    window.setTimeout(() => showCopyState('default'), 2000);
+                }
+            }
+
+            async function copyPassword() {
+                if (!resultTextarea.value || resultTextarea.value.startsWith('错误：')) {
+                    return;
+                }
+
+                let copied = false;
+                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    try {
+                        await navigator.clipboard.writeText(resultTextarea.value);
+                        copied = true;
+                    } catch (error) {
+                        copied = false;
+                    }
+                }
+
+                if (!copied) {
+                    copied = copyUsingSelection();
+                }
+
+                showCopyState(copied ? 'success' : 'error');
+            }
+
             // 复制按钮
-            copyBtn.addEventListener('click', function() {
-                if (!resultTextarea.value || resultTextarea.value.startsWith('错误：')) return;
-                navigator.clipboard.writeText(resultTextarea.value).then(() => {
-                    const defaultState = this.querySelector('.state-default');
-                    const successState = this.querySelector('.state-success');
-                    defaultState.style.display = 'none';
-                    successState.style.display = 'inline-flex';
-                    setTimeout(() => {
-                        defaultState.style.display = 'inline-flex';
-                        successState.style.display = 'none';
-                    }, 2000);
-                }).catch(err => { console.error('无法复制密码: ', err); });
+            copyBtn.addEventListener('click', () => {
+                void copyPassword();
             });
             
             // 表单提交（有 JS 时使用 AJAX）
