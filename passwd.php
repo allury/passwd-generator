@@ -8,7 +8,7 @@
  * 用于安全地生成密码，以及一个现代、响应式的前端界面
  * 用于用户交互。
  *
- * @version    1.1.6
+ * @version    1.1.7
  * @author     编码助手
  * @lastupdate 2026-08-30
  * ====================================================================
@@ -57,7 +57,6 @@ if (!headers_sent()) {
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: no-referrer');
-    header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
 }
 
 // --- 核心功能：安全地生成密码 ---

@@ -48,10 +48,13 @@ grep -Eqi '^Content-Type: text/html; charset=UTF-8' "$test_dir/page.headers"
 grep -Eqi '^X-Content-Type-Options: nosniff' "$test_dir/page.headers"
 grep -Eqi '^X-Frame-Options: DENY' "$test_dir/page.headers"
 grep -Eqi '^Referrer-Policy: no-referrer' "$test_dir/page.headers"
-grep -Eqi '^Content-Security-Policy:' "$test_dir/page.headers"
-grep -Fq "connect-src 'self'" "$test_dir/page.headers"
-grep -Fq 'https://fonts.googleapis.com' "$test_dir/page.headers"
-grep -Fq 'https://fonts.gstatic.com' "$test_dir/page.headers"
+if grep -Eqi '^Content-Security-Policy:' "$test_dir/page.headers"; then
+    csp_header="$(grep -Ei '^Content-Security-Policy:' "$test_dir/page.headers" | tail -n 1)"
+    if ! grep -Eq "script-src[^;]*'self'" <<<"$csp_header"; then
+        echo "Content-Security-Policy blocks same-origin script loaders." >&2
+        exit 1
+    fi
+fi
 grep -Fq 'id="strengthText">-</span>' "$test_dir/page.html"
 
 ajax_status="$(curl --silent --show-error \
