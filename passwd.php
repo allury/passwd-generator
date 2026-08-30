@@ -8,9 +8,9 @@
  * 用于安全地生成密码，以及一个现代、响应式的前端界面
  * 用于用户交互。
  *
- * @version    1.1.4
+ * @version    1.1.6
  * @author     编码助手
- * @lastupdate 2026-08-02
+ * @lastupdate 2026-08-30
  * ====================================================================
  */
 
@@ -50,9 +50,14 @@ function post_checkbox_enabled(string $name): bool {
 }
 
 if (!headers_sent()) {
+    header('Content-Type: text/html; charset=UTF-8');
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
     header('Expires: 0');
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
 }
 
 // --- 核心功能：安全地生成密码 ---
@@ -291,6 +296,7 @@ else if ($http_request_method === 'POST') {
         .theme-toggle { display: inline-flex; background-color: var(--input-bg-color); border-radius: 99px; padding: 4px; border: 1px solid var(--border-color); }
         .theme-toggle button { background: none; border: none; padding: 6px 16px; cursor: pointer; font-weight: 600; border-radius: 99px; color: var(--text-color-light); transition: var(--transition); }
         .theme-toggle button.active { background: var(--primary-color); color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .theme-toggle button:focus-visible, .btn:focus-visible, .btn-decrement:focus-visible, .btn-increment:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
         
         /* --- 密码显示与操作按钮 --- */
         #result { width: 100%; padding: 14px 16px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 20px; background: var(--input-bg-color); word-break: break-all; height: 80px; resize: none; overflow-y: auto; color: var(--text-color); transition: var(--transition); font-family: 'Courier New', Courier, monospace; display: flex; align-items: center; justify-content: center; text-align: center; }
@@ -310,6 +316,7 @@ else if ($http_request_method === 'POST') {
         .switch-container { display: flex; align-items: center; justify-content: space-between; background: var(--input-bg-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 12px; transition: var(--transition); }
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
+        .switch input:focus-visible + .slider { outline: 2px solid var(--primary-color); outline-offset: 2px; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--switch-bg-color); transition: .4s cubic-bezier(0.25, 0.8, 0.25, 1); border-radius: 26px; }
         .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: var(--switch-handle-color); transition: .4s cubic-bezier(0.25, 0.8, 0.25, 1); border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         input:checked + .slider { background-color: var(--primary-color); }
@@ -321,6 +328,7 @@ else if ($http_request_method === 'POST') {
         .btn-decrement:hover, .btn-increment:hover { background: var(--switch-bg-color); color: var(--text-color); }
         .length-input { flex-grow: 1; text-align: center; font-weight: 700; font-size: 20px; border: none; background: transparent; color: var(--text-color); padding: 0 8px; }
         .length-input:focus { outline: none; }
+        .length-input:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 2px; }
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
         
@@ -346,8 +354,8 @@ else if ($http_request_method === 'POST') {
             <h1>安全密码生成器</h1>
             <p>快速创建高强度、可自定义的随机密码</p>
             <div class="theme-toggle">
-                <button id="light-theme" type="button">☀️ 浅色</button>
-                <button id="dark-theme" type="button">🌙 深色</button>
+                <button id="light-theme" type="button" aria-pressed="false">☀️ 浅色</button>
+                <button id="dark-theme" type="button" aria-pressed="false">🌙 深色</button>
             </div>
         </header>
         
@@ -356,7 +364,7 @@ else if ($http_request_method === 'POST') {
             
             <!-- 密码显示与操作区域 -->
             <div class="password-display">
-                <textarea id="result" rows="1" readonly placeholder="点击“生成”按钮创建密码"><?php echo htmlspecialchars($generated_password); ?></textarea>
+                <textarea id="result" rows="1" readonly aria-label="生成的密码" placeholder="点击“生成”按钮创建密码"><?php echo htmlspecialchars($generated_password); ?></textarea>
                 <div class="password-actions">
                     <button type="button" class="btn btn-copy" id="copyBtn" aria-live="polite">
                         <span class="state-default" style="display: inline-flex; align-items: center; gap: 8px;">
@@ -387,9 +395,9 @@ else if ($http_request_method === 'POST') {
                 <div class="form-group">
                     <label for="length">密码长度</label>
                     <div class="length-control">
-                        <button class="btn-decrement" type="button" id="decrement">-</button>
+                        <button class="btn-decrement" type="button" id="decrement" aria-label="减少密码长度">-</button>
                         <input type="number" id="length" name="length" class="length-input" min="8" max="50" value="<?php echo (int)$options['length']; ?>">
-                        <button class="btn-increment" type="button" id="increment">+</button>
+                        <button class="btn-increment" type="button" id="increment" aria-label="增加密码长度">+</button>
                     </div>
                 </div>
                 <div class="switch-container">
@@ -525,16 +533,22 @@ else if ($http_request_method === 'POST') {
                     // 存储不可用时仍保持本次页面会话的主题设置。
                 }
             };
-            const setTheme = (theme) => {
+            const setTheme = (theme, persist = true) => {
                 const normalizedTheme = theme === 'dark' ? 'dark' : 'light';
-                body.classList.toggle('dark-mode', normalizedTheme === 'dark');
-                saveTheme(normalizedTheme);
-                lightThemeBtn.classList.toggle('active', normalizedTheme === 'light');
-                darkThemeBtn.classList.toggle('active', normalizedTheme === 'dark');
+                const isDark = normalizedTheme === 'dark';
+                body.classList.toggle('dark-mode', isDark);
+                if (persist) {
+                    saveTheme(normalizedTheme);
+                }
+                lightThemeBtn.classList.toggle('active', !isDark);
+                darkThemeBtn.classList.toggle('active', isDark);
+                lightThemeBtn.setAttribute('aria-pressed', String(!isDark));
+                darkThemeBtn.setAttribute('aria-pressed', String(isDark));
             };
             lightThemeBtn.addEventListener('click', () => setTheme('light'));
             darkThemeBtn.addEventListener('click', () => setTheme('dark'));
-            setTheme(getStoredTheme() || 'light'); // 优先从本地存储加载主题
+            const storedTheme = getStoredTheme();
+            setTheme(storedTheme === 'dark' ? 'dark' : 'light', false);
 
             // --- 核心功能函数 ---
 
@@ -577,8 +591,7 @@ else if ($http_request_method === 'POST') {
                         }
                         return;
                     }
-                    resultTextarea.value = data.password;
-                    updateStrengthIndicator(data.password);
+                    renderGeneratedPassword(data.password);
                 })
                 .catch(error => {
                     const isAbortError = error && typeof error === 'object' && error.name === 'AbortError';
@@ -586,8 +599,7 @@ else if ($http_request_method === 'POST') {
                         return;
                     }
                     const errorMessage = error && typeof error.message === 'string' ? error.message : '';
-                    resultTextarea.value = errorMessage.startsWith('错误：') ? errorMessage : '';
-                    updateStrengthIndicator('');
+                    renderGeneratedPassword(errorMessage.startsWith('错误：') ? errorMessage : '');
                     strengthText.textContent = errorMessage.startsWith('错误：') ? errorMessage : '生成失败';
                     console.error('密码生成失败:', error);
                 })
@@ -616,21 +628,64 @@ else if ($http_request_method === 'POST') {
                 strengthIndicator.style.setProperty('--strength-color', strength.color);
             }
 
+            function renderGeneratedPassword(password) {
+                resultTextarea.value = password;
+                updateStrengthIndicator(password);
+            }
+
             // --- 事件监听器绑定 ---
 
+            function showCopySuccess() {
+                const defaultState = copyBtn.querySelector('.state-default');
+                const successState = copyBtn.querySelector('.state-success');
+                defaultState.style.display = 'none';
+                successState.style.display = 'inline-flex';
+                window.setTimeout(() => {
+                    defaultState.style.display = 'inline-flex';
+                    successState.style.display = 'none';
+                }, 2000);
+            }
+
+            function copyUsingSelection() {
+                resultTextarea.focus();
+                resultTextarea.select();
+                resultTextarea.setSelectionRange(0, resultTextarea.value.length);
+                try {
+                    return document.execCommand('copy');
+                } catch (error) {
+                    return false;
+                }
+            }
+
+            async function copyPassword() {
+                if (!resultTextarea.value || resultTextarea.value.startsWith('错误：')) {
+                    return;
+                }
+
+                let copied = false;
+                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    try {
+                        await navigator.clipboard.writeText(resultTextarea.value);
+                        copied = true;
+                    } catch (error) {
+                        copied = false;
+                    }
+                }
+
+                if (!copied) {
+                    copied = copyUsingSelection();
+                }
+
+                if (copied) {
+                    showCopySuccess();
+                } else {
+                    console.error('无法复制密码，请手动选择复制。');
+                }
+            }
+
             // 复制按钮
-            copyBtn.addEventListener('click', function() {
-                if (!resultTextarea.value || resultTextarea.value.startsWith('错误：')) return;
-                navigator.clipboard.writeText(resultTextarea.value).then(() => {
-                    const defaultState = this.querySelector('.state-default');
-                    const successState = this.querySelector('.state-success');
-                    defaultState.style.display = 'none';
-                    successState.style.display = 'inline-flex';
-                    setTimeout(() => {
-                        defaultState.style.display = 'inline-flex';
-                        successState.style.display = 'none';
-                    }, 2000);
-                }).catch(err => { console.error('无法复制密码: ', err); });
+            copyBtn.addEventListener('click', () => {
+                void copyPassword();
             });
             
             // 表单提交（有 JS 时使用 AJAX）
