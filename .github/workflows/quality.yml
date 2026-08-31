@@ -31,6 +31,7 @@ jobs:
         run: |
           node tests/test_strength.js
           node tests/test_frontend.js
+          bash tests/test_release_metadata.sh
 
   php-syntax:
     name: PHP ${{ matrix.php }} syntax

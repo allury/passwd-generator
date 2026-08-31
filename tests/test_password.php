@@ -25,8 +25,12 @@ function expect_true(bool $condition, string $message): void
 
 $cases = [
     [16, true, true, true, true],
+    [8, true, false, false, false],
+    [8, false, true, false, false],
     [50, false, false, true, false],
     [24, false, false, false, true],
+    [32, true, true, false, false],
+    [32, false, false, true, true],
 ];
 
 foreach ($cases as [$length, $lowercase, $uppercase, $numbers, $symbols]) {
@@ -59,6 +63,8 @@ expect_true(
 
 expect_true(normalize_password_length([]) === 16, 'Array length input should use the default length.');
 expect_true(normalize_password_length('not-a-number') === 16, 'Invalid length input should use the default length.');
+expect_true(normalize_password_length('20.5') === 16, 'Decimal length input should use the default length.');
+expect_true(normalize_password_length(' 20 ') === 20, 'Whitespace around a valid length should be accepted.');
 expect_true(normalize_password_length(100) === 50, 'Length input should be capped at 50.');
 expect_true(normalize_password_length(4) === 8, 'Length input should be raised to the minimum of 8.');
 
@@ -68,6 +74,20 @@ $_POST['lowercase'] = 'false';
 expect_true(!post_checkbox_enabled('lowercase'), 'Checkbox value "false" should be disabled.');
 $_POST['lowercase'] = [];
 expect_true(!post_checkbox_enabled('lowercase'), 'Array checkbox input should be disabled.');
+$_POST['lowercase'] = 'YES';
+expect_true(post_checkbox_enabled('lowercase'), 'Checkbox values should be matched case-insensitively.');
+
+$_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
+expect_true(is_ajax_generation_request('POST'), 'A matching POST request should be treated as AJAX.');
+expect_true(!is_ajax_generation_request('GET'), 'A matching header on a GET request must not be treated as AJAX.');
+$_SERVER['HTTP_X_REQUESTED_WITH'] = [];
+expect_true(!is_ajax_generation_request('POST'), 'A non-string request header must not be treated as AJAX.');
+unset($_SERVER['HTTP_X_REQUESTED_WITH']);
+
+expect_true(
+    escape_html('<>&"\'') === '&lt;&gt;&amp;&quot;&#039;',
+    'HTML output must escape special characters with the documented UTF-8 strategy.'
+);
 
 $successful_result = generate_password_result(16, true, true, true, true);
 expect_true($successful_result['status'] === 200, 'Successful generation should return HTTP status 200.');

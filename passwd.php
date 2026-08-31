@@ -8,13 +8,14 @@
  * 用于安全地生成密码，以及一个现代、响应式的前端界面
  * 用于用户交互。
  *
- * @version    1.1.7
+ * @version    1.1.8
  * @author     编码助手
- * @lastupdate 2026-08-30
+ * @lastupdate 2026-08-31
  * ====================================================================
  */
 
-$http_request_method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$raw_request_method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$http_request_method = is_string($raw_request_method) ? strtoupper($raw_request_method) : 'GET';
 
 /**
  * 将外部长度参数限制在界面支持的范围内，并拒绝数组等异常输入。
@@ -47,6 +48,35 @@ function post_checkbox_enabled(string $name): bool {
     }
 
     return in_array(strtolower(trim((string)$value)), ['1', 'true', 'on', 'yes'], true);
+}
+
+/**
+ * 判断当前请求是否为页面发起的 AJAX 密码生成请求。
+ *
+ * @param string $request_method
+ * @return bool
+ */
+function is_ajax_generation_request(string $request_method): bool {
+    if ($request_method !== 'POST') {
+        return false;
+    }
+
+    $requested_with = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? null;
+    if (!is_string($requested_with)) {
+        return false;
+    }
+
+    return strcasecmp(trim($requested_with), 'XMLHttpRequest') === 0;
+}
+
+/**
+ * 对页面文本进行 UTF-8 HTML 转义。
+ *
+ * @param string $value
+ * @return string
+ */
+function escape_html(string $value): string {
+    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 if (!headers_sent()) {
@@ -191,7 +221,7 @@ function generate_password_result(int $length, bool $include_uppercase, bool $in
             $include_numbers,
             $include_symbols
         );
-    } catch (Throwable $exception) {
+    } catch (Throwable) {
         return [
             'password' => null,
             'error' => '错误：密码生成失败，请稍后重试。',
@@ -231,9 +261,7 @@ $options = [
 
 // 判断请求类型：是AJAX请求还是常规的表单提交
 // AJAX请求用于无刷新更新密码，提升用户体验
-if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
-    strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest' &&
-    $http_request_method === 'POST') {
+if (is_ajax_generation_request($http_request_method)) {
     
     $generation_result = generate_password_result(
         $length,
@@ -254,7 +282,7 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
     exit;
 }
 // 常规表单提交用于在JavaScript被禁用的情况下也能正常工作
-else if ($http_request_method === 'POST') {
+elseif ($http_request_method === 'POST') {
     $generation_result = generate_password_result(
         $length,
         (bool)$options['uppercase'],
@@ -363,7 +391,7 @@ else if ($http_request_method === 'POST') {
             
             <!-- 密码显示与操作区域 -->
             <div class="password-display">
-                <textarea id="result" rows="1" readonly aria-label="生成的密码" placeholder="点击“生成”按钮创建密码"><?php echo htmlspecialchars($generated_password); ?></textarea>
+                <textarea id="result" rows="1" readonly aria-label="生成的密码" placeholder="点击“生成”按钮创建密码"><?php echo escape_html($generated_password); ?></textarea>
                 <div class="password-actions">
                     <button type="button" class="btn btn-copy" id="copyBtn" aria-live="polite">
                         <span class="state-default" style="display: inline-flex; align-items: center; gap: 8px;">
@@ -508,14 +536,28 @@ else if ($http_request_method === 'POST') {
         document.addEventListener('DOMContentLoaded', () => {
             // --- DOM元素获取 ---
             const getEl = (id) => document.getElementById(id);
-            const passwordForm = getEl('passwordForm'), resultTextarea = getEl('result'),
-                  copyBtn = getEl('copyBtn'), generateBtn = getEl('generateBtn'),
-                  lengthInput = getEl('length'), decrementBtn = getEl('decrement'),
-                  incrementBtn = getEl('increment'), strengthIndicator = getEl('strengthIndicator'),
-                  strengthText = getEl('strengthText'), body = document.body,
-                  lightThemeBtn = getEl('light-theme'), darkThemeBtn = getEl('dark-theme');
+            const passwordForm = getEl('passwordForm');
+            const resultTextarea = getEl('result');
+            const copyBtn = getEl('copyBtn');
+            const generateBtn = getEl('generateBtn');
+            const lengthInput = getEl('length');
+            const decrementBtn = getEl('decrement');
+            const incrementBtn = getEl('increment');
+            const strengthIndicator = getEl('strengthIndicator');
+            const strengthText = getEl('strengthText');
+            const body = document.body;
+            const lightThemeBtn = getEl('light-theme');
+            const darkThemeBtn = getEl('dark-theme');
+            const generateDefaultState = generateBtn.querySelector('.state-default');
+            const generateLoadingState = generateBtn.querySelector('.state-loading');
+            const copyDefaultState = copyBtn.querySelector('.state-default');
+            const copySuccessState = copyBtn.querySelector('.state-success');
+            const supportsAjaxGeneration = typeof fetch === 'function'
+                && typeof FormData === 'function'
+                && typeof URLSearchParams === 'function';
             let generationRequestId = 0;
             let generationController = null;
+            let copyFeedbackTimer = null;
 
             // --- 主题管理 ---
             const getStoredTheme = () => {
@@ -554,45 +596,66 @@ else if ($http_request_method === 'POST') {
             /**
              * 异步生成密码并更新UI
              */
-            function generatePassword() {
+            async function generatePassword() {
                 const requestId = ++generationRequestId;
-                const defaultState = generateBtn.querySelector('.state-default');
-                const loadingState = generateBtn.querySelector('.state-loading');
 
                 if (generationController) {
                     generationController.abort();
                 }
-                generationController = new AbortController();
+                const requestController = typeof AbortController === 'function'
+                    ? new AbortController()
+                    : null;
+                generationController = requestController;
                 
                 // 切换到加载状态
-                defaultState.style.display = 'none'; 
-                loadingState.style.display = 'inline-flex';
+                generateDefaultState.style.display = 'none';
+                generateLoadingState.style.display = 'inline-flex';
                 generateBtn.disabled = true;
-                
-                // 发送AJAX请求到后端
-                fetch('', { 
-                    method: 'POST', 
-                    signal: generationController.signal,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' }, 
-                    body: new URLSearchParams(new FormData(passwordForm)) 
-                })
-                .then(async response => {
-                    const data = await response.json().catch(() => null);
+
+                try {
+                    // 发送 AJAX 请求到后端。请求体构造和 fetch 的同步异常也由本流程处理。
+                    const requestBody = new URLSearchParams(new FormData(passwordForm));
+                    const requestOptions = {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: requestBody,
+                    };
+                    if (requestController) {
+                        requestOptions.signal = requestController.signal;
+                    }
+                    const response = await fetch('', requestOptions);
+
+                    let data = null;
+                    try {
+                        data = await response.json();
+                    } catch (error) {
+                        data = null;
+                    }
+
                     if (!response.ok) {
                         throw new Error(data && typeof data.error === 'string' ? data.error : `HTTP ${response.status}`);
                     }
-                    return data;
-                })
-                .then(data => {
-                    if (requestId !== generationRequestId || !data || typeof data.password !== 'string') {
-                        if (requestId === generationRequestId) {
-                            throw new Error('服务器返回了无效的密码数据');
-                        }
+
+                    if (requestId !== generationRequestId) {
                         return;
                     }
+
+                    const hasValidPassword = data
+                        && typeof data === 'object'
+                        && !Array.isArray(data)
+                        && typeof data.password === 'string'
+                        && data.password.length >= 8
+                        && data.password.length <= 50
+                        && !data.password.startsWith('错误：');
+                    if (!hasValidPassword) {
+                        throw new Error('服务器返回了无效的密码数据');
+                    }
+
                     renderGeneratedPassword(data.password);
-                })
-                .catch(error => {
+                } catch (error) {
                     const isAbortError = error && typeof error === 'object' && error.name === 'AbortError';
                     if (isAbortError || requestId !== generationRequestId) {
                         return;
@@ -601,17 +664,20 @@ else if ($http_request_method === 'POST') {
                     renderGeneratedPassword(errorMessage.startsWith('错误：') ? errorMessage : '');
                     strengthText.textContent = errorMessage.startsWith('错误：') ? errorMessage : '生成失败';
                     console.error('密码生成失败:', error);
-                })
-                .finally(() => {
+                } finally {
                     if (requestId !== generationRequestId) {
                         return;
                     }
-                    generationController = null;
+
+                    if (generationController === requestController) {
+                        generationController = null;
+                    }
+
                     // 无论成功或失败，都恢复按钮的默认状态
-                    defaultState.style.display = 'inline-flex'; 
-                    loadingState.style.display = 'none';
+                    generateDefaultState.style.display = 'inline-flex';
+                    generateLoadingState.style.display = 'none';
                     generateBtn.disabled = false;
-                });
+                }
             }
 
             /**
@@ -635,21 +701,24 @@ else if ($http_request_method === 'POST') {
             // --- 事件监听器绑定 ---
 
             function showCopySuccess() {
-                const defaultState = copyBtn.querySelector('.state-default');
-                const successState = copyBtn.querySelector('.state-success');
-                defaultState.style.display = 'none';
-                successState.style.display = 'inline-flex';
-                window.setTimeout(() => {
-                    defaultState.style.display = 'inline-flex';
-                    successState.style.display = 'none';
+                if (copyFeedbackTimer !== null) {
+                    window.clearTimeout(copyFeedbackTimer);
+                }
+
+                copyDefaultState.style.display = 'none';
+                copySuccessState.style.display = 'inline-flex';
+                copyFeedbackTimer = window.setTimeout(() => {
+                    copyDefaultState.style.display = 'inline-flex';
+                    copySuccessState.style.display = 'none';
+                    copyFeedbackTimer = null;
                 }, 2000);
             }
 
             function copyUsingSelection() {
-                resultTextarea.focus();
-                resultTextarea.select();
-                resultTextarea.setSelectionRange(0, resultTextarea.value.length);
                 try {
+                    resultTextarea.focus();
+                    resultTextarea.select();
+                    resultTextarea.setSelectionRange(0, resultTextarea.value.length);
                     return document.execCommand('copy');
                 } catch (error) {
                     return false;
@@ -662,13 +731,14 @@ else if ($http_request_method === 'POST') {
                 }
 
                 let copied = false;
-                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                    try {
-                        await navigator.clipboard.writeText(resultTextarea.value);
+                try {
+                    const clipboard = typeof navigator === 'object' ? navigator.clipboard : null;
+                    if (clipboard && typeof clipboard.writeText === 'function') {
+                        await clipboard.writeText(resultTextarea.value);
                         copied = true;
-                    } catch (error) {
-                        copied = false;
                     }
+                } catch (error) {
+                    copied = false;
                 }
 
                 if (!copied) {
@@ -689,38 +759,59 @@ else if ($http_request_method === 'POST') {
             
             // 表单提交（有 JS 时使用 AJAX）
             passwordForm.addEventListener('submit', (e) => {
+                if (!supportsAjaxGeneration) {
+                    return;
+                }
+
                 e.preventDefault();
-                generatePassword();
+                void generatePassword();
             });
-            
+
+            function requestPasswordGeneration() {
+                if (supportsAjaxGeneration) {
+                    void generatePassword();
+                }
+            }
+
+            function normalizeLengthInput() {
+                let min = Number.parseInt(lengthInput.min, 10);
+                let max = Number.parseInt(lengthInput.max, 10);
+                if (Number.isNaN(min) || Number.isNaN(max) || max < min) {
+                    min = 8;
+                    max = 50;
+                }
+
+                const parsedLength = Number.parseInt(lengthInput.value, 10);
+                const requestedLength = Number.isNaN(parsedLength) ? min : parsedLength;
+                const normalizedLength = Math.min(max, Math.max(min, requestedLength));
+                lengthInput.value = String(normalizedLength);
+
+                return { value: normalizedLength, min, max };
+            }
+
             // 长度控制器
-            decrementBtn.addEventListener('click', () => { 
-                const currentLength = parseInt(lengthInput.value); 
-                if (currentLength > parseInt(lengthInput.min)) { 
-                    lengthInput.value = currentLength - 1; 
-                    generatePassword(); 
-                } 
+            decrementBtn.addEventListener('click', () => {
+                const length = normalizeLengthInput();
+                if (length.value > length.min) {
+                    lengthInput.value = String(length.value - 1);
+                    requestPasswordGeneration();
+                }
             });
-            incrementBtn.addEventListener('click', () => { 
-                const currentLength = parseInt(lengthInput.value); 
-                if (currentLength < parseInt(lengthInput.max)) { 
-                    lengthInput.value = currentLength + 1; 
-                    generatePassword(); 
-                } 
+            incrementBtn.addEventListener('click', () => {
+                const length = normalizeLengthInput();
+                if (length.value < length.max) {
+                    lengthInput.value = String(length.value + 1);
+                    requestPasswordGeneration();
+                }
             });
-            lengthInput.addEventListener('change', () => { 
-                let len = parseInt(lengthInput.value); 
-                const min = parseInt(lengthInput.min); 
-                const max = parseInt(lengthInput.max); 
-                if (isNaN(len) || len < min) { len = min; } 
-                else if (len > max) { len = max; } 
-                lengthInput.value = len; 
-                generatePassword(); 
+            lengthInput.addEventListener('change', () => {
+                normalizeLengthInput();
+                requestPasswordGeneration();
             });
             
             // 字符类型选项
-            ['lowercase', 'uppercase', 'numbers', 'symbols'].forEach(option => { 
-                getEl(option).addEventListener('change', generatePassword); 
+            ['lowercase', 'uppercase', 'numbers', 'symbols'].forEach(option => {
+                getEl(option).addEventListener('change', requestPasswordGeneration);
             });
             
             // --- 初始化 ---

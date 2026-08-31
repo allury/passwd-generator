@@ -35,6 +35,12 @@ jobs:
             exit 1
           fi
 
+          code_version="$(sed -nE 's/^[[:space:]]*\*[[:space:]]*@version[[:space:]]+([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$/\1/p' passwd.php)"
+          if [[ "$TAG" != "v${code_version}" ]]; then
+            echo "Tag ${TAG} does not match passwd.php version ${code_version}." >&2
+            exit 1
+          fi
+
           notes_file=".github/releases/${TAG}.md"
           if [[ ! -f "$notes_file" ]]; then
             echo "Release notes not found: $notes_file" >&2
@@ -42,8 +48,36 @@ jobs:
           fi
 
           git rev-parse --verify "refs/tags/${TAG}^{commit}" >/dev/null
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          tag_commit="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+          if ! git merge-base --is-ancestor "$tag_commit" refs/remotes/origin/main; then
+            echo "Release tag ${TAG} is not contained in main." >&2
+            exit 1
+          fi
+
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          coverage: none
+
+      - name: Run release checks
+        run: |
+          set -euo pipefail
+          php -l passwd.php
+          php tests/test_password.php
+          node tests/test_strength.js
+          node tests/test_frontend.js
+          bash tests/test_http.sh
+          bash tests/test_release_metadata.sh
 
       - name: Create or synchronize Release
         env:

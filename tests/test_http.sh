@@ -45,6 +45,8 @@ curl --silent --show-error --fail \
     "$base_url"
 
 grep -Eqi '^Content-Type: text/html; charset=UTF-8' "$test_dir/page.headers"
+grep -Eqi '^Cache-Control: no-store, no-cache, must-revalidate, max-age=0' "$test_dir/page.headers"
+grep -Eqi '^Pragma: no-cache' "$test_dir/page.headers"
 grep -Eqi '^X-Content-Type-Options: nosniff' "$test_dir/page.headers"
 grep -Eqi '^X-Frame-Options: DENY' "$test_dir/page.headers"
 grep -Eqi '^Referrer-Policy: no-referrer' "$test_dir/page.headers"
@@ -80,11 +82,13 @@ error_status="$(curl --silent --show-error \
     --request POST \
     --header 'X-Requested-With: XMLHttpRequest' \
     --data 'form_submitted=1&length=16' \
+    --dump-header "$test_dir/error.headers" \
     --output "$test_dir/error.json" \
     --write-out '%{http_code}' \
     "$base_url")"
 
 [[ "$error_status" == "422" ]]
+grep -Eqi '^Content-Type: application/json; charset=UTF-8' "$test_dir/error.headers"
 php -r '
     $data = json_decode(file_get_contents($argv[1]), true);
     if (!is_array($data) || !isset($data["error"]) || !str_starts_with($data["error"], "错误：")) {
@@ -92,6 +96,28 @@ php -r '
         exit(1);
     }
 ' "$test_dir/error.json"
+
+array_length_status="$(curl --silent --show-error \
+    --request POST \
+    --header 'X-Requested-With: XMLHttpRequest' \
+    --data-urlencode 'form_submitted=1' \
+    --data-urlencode 'length[]=16' \
+    --data-urlencode 'lowercase=on' \
+    --data-urlencode 'uppercase=on' \
+    --data-urlencode 'numbers=on' \
+    --data-urlencode 'symbols=on' \
+    --output "$test_dir/array-length.json" \
+    --write-out '%{http_code}' \
+    "$base_url")"
+
+[[ "$array_length_status" == "200" ]]
+php -r '
+    $data = json_decode(file_get_contents($argv[1]), true);
+    if (!is_array($data) || !isset($data["password"]) || strlen($data["password"]) !== 16) {
+        fwrite(STDERR, "Array length input did not fall back safely.\n");
+        exit(1);
+    }
+' "$test_dir/array-length.json"
 
 curl --silent --show-error --fail \
     --request POST \
@@ -111,5 +137,13 @@ php -r '
         exit(1);
     }
 ' "$test_dir/form.html"
+
+curl --silent --show-error --fail \
+    --request POST \
+    --data 'form_submitted=1&length=16' \
+    --output "$test_dir/form-error.html" \
+    "$base_url"
+
+grep -Fq '错误：请至少选择一种字符类型。' "$test_dir/form-error.html"
 
 echo "HTTP integration tests passed."
