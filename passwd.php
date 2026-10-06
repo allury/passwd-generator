@@ -8,9 +8,9 @@
  * 用于安全地生成密码，以及一个现代、响应式的前端界面
  * 用于用户交互。
  *
- * @version    1.1.8
+ * @version    1.1.9
  * @author     编码助手
- * @lastupdate 2026-08-31
+ * @lastupdate 2026-10-06
  * ====================================================================
  */
 
@@ -79,64 +79,55 @@ function escape_html(string $value): string {
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+// 每个响应生成一次性的 CSP nonce，只允许本页自带的内联脚本和样式执行。
+$csp_nonce = base64_encode(random_bytes(16));
+
 if (!headers_sent()) {
     header('Content-Type: text/html; charset=UTF-8');
-    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    // no-transform：禁止 Cloudflare 等中间层改写页面或注入脚本（Rocket Loader、JS 检测、Web Analytics）。
+    // 页面因此可以使用严格的内容安全策略，也不会执行任何第三方脚本。
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0, no-transform');
     header('Pragma: no-cache');
     header('Expires: 0');
     header('X-Content-Type-Options: nosniff');
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: no-referrer');
+    header(
+        "Content-Security-Policy: default-src 'none'; "
+        . "script-src 'nonce-{$csp_nonce}'; "
+        . "style-src 'nonce-{$csp_nonce}' https://fonts.googleapis.com; "
+        . "font-src https://fonts.gstatic.com; "
+        . "connect-src 'self'; img-src 'self' data:; "
+        . "form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+    );
+    header('Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+    header('Cross-Origin-Opener-Policy: same-origin');
 }
 
 // --- 核心功能：安全地生成密码 ---
 
 /**
- * 使用加密安全随机数重排字符串，并避免相邻字符重复
+ * 判断密码是否包含每个所选字符集中的至少一个字符。
  *
- * @param string $string
- * @return string
+ * @param string   $password
+ * @param string[] $char_sets
+ * @return bool
  */
-function secure_str_shuffle(string $string): string {
-    $counts = array_count_values(str_split($string));
-    $remaining = strlen($string);
-    $previous = null;
-    $result = '';
-
-    while ($remaining > 0) {
-        $max_count = 0;
-        $candidates = [];
-
-        foreach ($counts as $raw_char => $count) {
-            $char = (string)$raw_char;
-            if ($count <= 0 || $char === $previous) {
-                continue;
-            }
-
-            if ($count > $max_count) {
-                $max_count = $count;
-                $candidates = [$raw_char];
-            } elseif ($count === $max_count) {
-                $candidates[] = $raw_char;
-            }
+function password_contains_each_set(string $password, array $char_sets): bool {
+    foreach ($char_sets as $char_set) {
+        if (strpbrk($password, $char_set) === false) {
+            return false;
         }
-
-        if (empty($candidates)) {
-            throw new RuntimeException('无法生成不含相邻重复字符的密码。');
-        }
-
-        $chosen = $candidates[random_int(0, count($candidates) - 1)];
-        $result .= (string)$chosen;
-        $counts[$chosen]--;
-        $previous = (string)$chosen;
-        $remaining--;
     }
 
-    return $result;
+    return true;
 }
 
 /**
  * 根据指定的标准生成一个加密安全的随机密码。
+ *
+ * 逐位从所选字符的完整字符池中均匀抽取，并跳过与前一位相同的字符；结果缺少任一所选类型时整体重新生成。
+ * 这样得到的是满足全部规则的密码中均匀随机的一个，不会让重复字符集中出现在开头或让某类字符偏多。
  *
  * @param int    $length            密码的目标长度。
  * @param bool   $include_uppercase 是否包含大写字母。
@@ -158,53 +149,53 @@ function generate_secure_password(int $length, bool $include_uppercase, bool $in
     $uppercase_chars = str_replace(str_split($ambiguous), '', $uppercase_chars);
     $number_chars    = str_replace(str_split($ambiguous), '', $number_chars);
 
-    $char_pool = ''; // 用于填充密码剩余长度的字符池
-    $password = '';  // 最终的密码
-
-    // 步骤1: 确保每种选定的字符类型都至少在密码中出现一次
+    // 收集所选字符集，每种类型至少要在密码中出现一次
+    $selected_sets = [];
     if ($include_lowercase && $lowercase_chars !== '') {
-        $char_pool .= $lowercase_chars;
-        $password .= $lowercase_chars[random_int(0, strlen($lowercase_chars) - 1)];
+        $selected_sets[] = $lowercase_chars;
     }
     if ($include_uppercase && $uppercase_chars !== '') {
-        $char_pool .= $uppercase_chars;
-        $password .= $uppercase_chars[random_int(0, strlen($uppercase_chars) - 1)];
+        $selected_sets[] = $uppercase_chars;
     }
     if ($include_numbers && $number_chars !== '') {
-        $char_pool .= $number_chars;
-        $password .= $number_chars[random_int(0, strlen($number_chars) - 1)];
+        $selected_sets[] = $number_chars;
     }
     if ($include_symbols && $symbol_chars !== '') {
-        $char_pool .= $symbol_chars;
-        $password .= $symbol_chars[random_int(0, strlen($symbol_chars) - 1)];
+        $selected_sets[] = $symbol_chars;
     }
 
     // 如果用户未选择任何字符类型，则返回错误
-    if (empty($char_pool)) {
+    if ($selected_sets === []) {
         return '错误：请至少选择一种字符类型。';
     }
 
     // 检查密码长度是否足够容纳所有选定的字符类型
-    $selected_types_count = (int)$include_uppercase + (int)$include_lowercase + (int)$include_numbers + (int)$include_symbols;
-    if ($length < $selected_types_count) {
+    if ($length < count($selected_sets)) {
         return '错误：密码长度不能小于所选字符类型的数量。';
     }
 
-    // 步骤2: 使用完整的字符池随机填充密码的剩余部分（默认避免连续重复字符）
-    $remaining_length = $length - strlen($password);
-    if ($remaining_length > 0) {
-        $pool_length = strlen($char_pool) - 1;
-        for ($i = 0; $i < $remaining_length; $i++) {
+    $char_pool = implode('', $selected_sets);
+    $pool_last_index = strlen($char_pool) - 1;
+
+    // 最短 8 位且四类全选时单次满足条件的概率约 44%（平均约 2.3 次）；1000 次仍不成功的概率约为 10^-253。
+    for ($attempt = 0; $attempt < 1000; $attempt++) {
+        $password = '';
+        $previous = '';
+        for ($i = 0; $i < $length; $i++) {
             // 默认开启：避免连续相同字符
             do {
-                $new_char = $char_pool[random_int(0, $pool_length)];
-            } while (strlen($password) > 0 && $new_char === $password[-1]);
-            $password .= $new_char;
+                $char = $char_pool[random_int(0, $pool_last_index)];
+            } while ($char === $previous);
+            $password .= $char;
+            $previous = $char;
+        }
+
+        if (password_contains_each_set($password, $selected_sets)) {
+            return $password;
         }
     }
-    
-    // 步骤3: 打乱密码字符串
-    return secure_str_shuffle($password);
+
+    throw new RuntimeException('无法生成满足所选规则的密码。');
 }
 
 /**
@@ -299,7 +290,7 @@ elseif ($http_request_method === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>安全密码生成器</title>
-    <style>
+    <style nonce="<?php echo escape_html($csp_nonce); ?>">
         /* --- 引入外部字体 --- */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
@@ -368,8 +359,14 @@ elseif ($http_request_method === 'POST') {
         /* --- 响应式设计 --- */
         @media (max-width: 500px) { .container { padding: 20px; } .header h1 { font-size: 24px; } .password-actions { flex-direction: column; } }
         
+        /* --- 按钮状态（原为内联样式；内容安全策略不允许 style 属性，取值保持不变） --- */
+        .state-default, .state-success, .state-loading { align-items: center; gap: 8px; }
+        .state-default { display: inline-flex; }
+        .state-success, .state-loading { display: none; }
+
         /* --- 动画效果 --- */
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
     </style>
 </head>
 <body>
@@ -391,25 +388,25 @@ elseif ($http_request_method === 'POST') {
             
             <!-- 密码显示与操作区域 -->
             <div class="password-display">
-                <textarea id="result" rows="1" readonly aria-label="生成的密码" placeholder="点击“生成”按钮创建密码"><?php echo escape_html($generated_password); ?></textarea>
+                <textarea id="result" rows="1" readonly autocomplete="off" spellcheck="false" aria-label="生成的密码" placeholder="点击“生成”按钮创建密码"><?php echo escape_html($generated_password); ?></textarea>
                 <div class="password-actions">
                     <button type="button" class="btn btn-copy" id="copyBtn" aria-live="polite">
-                        <span class="state-default" style="display: inline-flex; align-items: center; gap: 8px;">
+                        <span class="state-default">
                             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z"/></svg>
                             <span>复制密码</span>
                         </span>
-                        <span class="state-success" style="display: none; align-items: center; gap: 8px;">
+                        <span class="state-success">
                             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"/></svg>
                             <span>已复制!</span>
                         </span>
                     </button>
                     <button type="submit" class="btn btn-generate" id="generateBtn">
-                        <span class="state-default" style="display: inline-flex; align-items: center; gap: 8px;">
+                        <span class="state-default">
                             <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/></svg>
                             <span>生成</span>
                         </span>
-                        <span class="state-loading" style="display: none; align-items: center; gap: 8px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" style="animation: spin 1s linear infinite;"><path fill="currentColor" d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/></svg>
+                        <span class="state-loading">
+                            <svg class="spin" width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/></svg>
                             <span>生成中...</span>
                         </span>
                     </button>
@@ -458,13 +455,13 @@ elseif ($http_request_method === 'POST') {
                 <div class="strength-meter">
                     <span class="strength-label">密码强度:</span>
                     <div class="indicator"><div class="progress" id="strengthIndicator"></div></div>
-                    <span class="strength-text" id="strengthText">-</span>
+                    <span class="strength-text" aria-live="polite" id="strengthText">-</span>
                 </div>
             </div>
         </form>
     </div>
 
-    <script>
+    <script data-cfasync="false" nonce="<?php echo escape_html($csp_nonce); ?>">
         /**
          * 根据生成密码实际使用的字符池估算组合空间，并返回强度展示信息。
          *

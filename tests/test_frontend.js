@@ -6,7 +6,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const page = fs.readFileSync(path.join(__dirname, '..', 'passwd.php'), 'utf8');
-const scriptMatch = page.match(/<script>([\s\S]*?)<\/script>/);
+// 脚本标签带有 nonce 等属性，属性值中的 PHP 片段（?>）也包含 >，匹配时需整体跳过。
+const scriptMatch = page.match(/<script\b(?:<\?php[\s\S]*?\?>|[^>])*>([\s\S]*?)<\/script>/);
 assert.ok(scriptMatch, 'The page must contain a frontend script.');
 const script = scriptMatch[1];
 assert.doesNotThrow(() => new Function(script), 'The frontend script must be valid JavaScript.');

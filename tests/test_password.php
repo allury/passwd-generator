@@ -61,6 +61,37 @@ expect_true(
     'Empty character selection should return an error.'
 );
 
+expect_true(password_contains_each_set('aB3!', ['abc', 'ABC', '23', '!?']), 'All selected character sets should be detected.');
+expect_true(!password_contains_each_set('aB!', ['abc', 'ABC', '23', '!?']), 'A missing character set should be detected.');
+
+// Distribution regression: the former shuffle always placed the most frequent characters first, so the first
+// character repeated later in about 74% of 16-character passwords (about 15% for uniform generation), and the first
+// six characters of 50-character passwords were almost always repeated characters (under 1% for uniform generation).
+$first_character_repeats = 0;
+for ($iteration = 0; $iteration < 2000; $iteration++) {
+    $password = generate_secure_password(16, true, true, true, true);
+    if (strpos($password, $password[0], 1) !== false) {
+        $first_character_repeats++;
+    }
+}
+expect_true($first_character_repeats / 2000 < 0.35, 'The first character repeats far more often than uniform generation allows.');
+
+$repeated_heads = 0;
+for ($iteration = 0; $iteration < 500; $iteration++) {
+    $password = generate_secure_password(50, true, true, true, true);
+    $head_is_repeated = true;
+    foreach (str_split(substr($password, 0, 6)) as $character) {
+        if (substr_count($password, $character) < 2) {
+            $head_is_repeated = false;
+            break;
+        }
+    }
+    if ($head_is_repeated) {
+        $repeated_heads++;
+    }
+}
+expect_true($repeated_heads / 500 < 0.2, 'Repeated characters must not cluster at the start of long passwords.');
+
 expect_true(normalize_password_length([]) === 16, 'Array length input should use the default length.');
 expect_true(normalize_password_length('not-a-number') === 16, 'Invalid length input should use the default length.');
 expect_true(normalize_password_length('20.5') === 16, 'Decimal length input should use the default length.');
